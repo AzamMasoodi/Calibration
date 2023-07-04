@@ -99,7 +99,9 @@ class LisemKOptimizer:
         ksat = ksat_file.read(1)
         # Replace cell value with k value
         ksat[:, :] = k
-
+        # Save the modified data back to the raster file
+        ksat_file.write(ksat, 1)
+        ksat_file.close()  # Close the raster file
         # Run lisem with the run file
         os.system(f"{lisem_path} -r {run_path}")
 
@@ -138,9 +140,6 @@ class LisemKOptimizer:
         df['Time(min)'] = pd.to_numeric(df['Time(min)'])  # Convert values in 'Column1' to numeric
         filtered_df= df[df['Time(min)'].astype(int) == df['Time(min)']]  # Filter rows with integer values in first column
         filtered_df = filtered_df.rename(columns={filtered_df.columns[1]: 'Channels'})  # Rename second column to 'Channels'
-        # will be removed
-        print(filtered_df)
-
         return filtered_df
         
     
