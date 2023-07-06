@@ -10,10 +10,51 @@ class LisemKOptimizer:
     def __init__(self, run_file, obs_file, lisem_path):
         self.run_file = run_file
         self.obs_file = obs_file
-        # self.output_file = output_file
         self.lisem_path = lisem_path
 
-    def opt_k(self, min_k, max_k, num_steps):
+    def regulaFalsi_k(self, min_k, max_k, epsilon, num_steps: int):
+        """
+        Implements regula Falsi method to find the optimal 'k' value by iterating through a range of 'k' values.
+        Calls the open_lisem, filterdata, and nse functions(Bias).
+
+        Args:
+            min_k (float): Minimum value of 'k' to start the iteration.
+            max_k (float): Maximum value of 'k' to end the iteration.
+            num_steps (int, optional): Number of steps within the range of 'k' values.
+
+        Returns:
+            float: Optimal 'k' value.
+
+        """
+        round=0
+        f_min_k = self.run_k(min_k)[1]
+        f_max_k = self.run_k(max_k)[1]
+        if f_min_k * f_max_k >= 0: 
+            print("You have not assumed right a and b") 
+            return -1
+        c = min_k # Initialize result 
+          
+        for i in range(num_steps): 
+            round += 1
+            # Find the point that touches x-axis 
+            c = (min_k * f_max_k - max_k * f_min_k)/ (f_max_k - f_min_k) 
+            f_opt_k = self.run_k(c)[1] 
+            print(
+                 f'round = {round}, k = {c}, bias={f_opt_k}') 
+            # Check if the above found point is the root 
+            if abs(f_opt_k) < epsilon:
+                break
+            
+            # Decide the side to repeat the steps 
+            elif (f_opt_k  * f_min_k) < 0: 
+                max_k = c 
+                f_max_k = f_opt_k
+            else: 
+                min_k = c 
+                f_min_k = f_opt_k
+        print("The value of k_opt is : " , '%.4f' %c)
+        
+    def opt_k(self, min_k, max_k, num_steps: int):
         """
         Implements the Try and Error method to find the optimal 'k' value by iterating through a range of 'k' values.
         Calls the open_lisem, filterdata, and nse functions.
@@ -30,7 +71,6 @@ class LisemKOptimizer:
         round = 0
         max_result = 0.0
         k_opt = None
-
         while True:
             step = (max_k - min_k) / (num_steps - 1)  # Calculate the step size
             # Generate the 'k' values
@@ -54,11 +94,12 @@ class LisemKOptimizer:
     def run_opt_round(self, k_values: list, round_no: int):
         results = []
         for run_no, k in enumerate(k_values):
-            results.append(self.run_k(k))
+            results.append(self.run_k(k)[0])
             print(
                 f'round = {round_no}, run = {run_no}/{len(k_values)}, k = {k_values[run_no]}')
         return results
-
+        
+ 
     def run_k(self, k):
         """
         Runs lisem with a specific k value and returns the nse and bias of that run
@@ -71,8 +112,7 @@ class LisemKOptimizer:
         """
         self.open_lisem(k)
         output_df = self.filterdata()
-
-        return self.nse(obs_file, output_df)[0]
+        return self.nse(obs_file, output_df)
 
     def get_value_from_runfile(self, variablename):
         """
@@ -151,7 +191,6 @@ class LisemKOptimizer:
         filtered_df.reset_index(drop=True, inplace=True)
         return filtered_df
 
-
 if __name__ == '__main__':
     # Path to the executable file
     lisem_path = "C:/Masoodi/lisem/lisemv6873/Lisem.exe"
@@ -161,4 +200,5 @@ if __name__ == '__main__':
     # Specify the observation CSV file path
     obs_file = 'C:/Masoodi/test/obs1/obs6.csv'
     opt = LisemKOptimizer(run_path, obs_file, lisem_path)
-    opt.opt_k(2, 20, 5)
+    opt.opt_k(1, 5, 5)
+    #opt.regulaFalsi_k(1, 5, 0.01, 5)
