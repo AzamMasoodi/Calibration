@@ -4,6 +4,7 @@ A wrapper to run open lisem from Python
 import os
 from pathlib import Path
 import re
+import pandas as pd
 
 class LisemRunner:
     """
@@ -48,13 +49,13 @@ class LisemRunner:
             virtual_frame_buffer: A boolean flag to indicate if Lisem should be run in a virtual framebuffer for speed up
                                 and to run on headless systems. Ignored on non-posix systems
         """
+        self.runfile = Path(runfile).read_text()
         self.name = name
         self.lisempath = Path(lisempath).absolute()
         self.path = Path(runfile).parent
         self.virtual_frame_buffer = virtual_frame_buffer and os.name == 'posix'
-        self.runfile = Path(runfile).read_text()
-        self['Result Directory'] += self.name + '/'
-
+        self.result_path = Path(self['Result Directory'])
+        
     def __getitem__(self, item):
         item = self.alias.get(item, item.replace('_', ' '))
         m = re.search(f'^{item}\\ *=\\ *(.*)', self.runfile, flags=re.MULTILINE)
@@ -68,9 +69,11 @@ class LisemRunner:
                 continue
         else:
             return m[1]
+
     def __setitem__(self, item, value):
         item = self.alias.get(item, item.replace('_', ' '))
-        value = str(value).replace('.', ',')
+        # Use os locale to convert float to str
+        value = str(value) # .replace('.', ',')
         new_runfile, n = re.subn(f'^{item}\\ *=\\ *(.*)', item + '=' + value, self.runfile, flags=re.MULTILINE)
         if n == 0:
             raise KeyError(f'{item} not in lisem runfile')
@@ -85,6 +88,9 @@ class LisemRunner:
     def keys(self):
         for m in re.finditer('(.*)=(.*)', self.runfile, flags=re.MULTILINE):
             yield m.group(1)
+            
+    def __iter__(self):
+        return self.keys()
 
     def values(self):
         for m in re.finditer('(.*)=(.*)', self.runfile, flags=re.MULTILINE):
@@ -99,24 +105,50 @@ class LisemRunner:
 
     def save(self):
         """Save the modified runfile"""
+        print((self.result_path / self.name).as_posix())
+        self['Result Directory'] = (self.result_path / self.name).as_posix()
         self.runfilename().write_text(self.runfile)
 
-    def __getattr__(self, item):
-        return self[item]
+    def get_result(self):
+        """
+        Reads the result CSV file ('totalseries.csv'), filters the data based on the first and tenth columns,
+        converts the 'Time' column which is an integer, and return the filtered data.
 
-    def run(self, **kwargs):
-        """Saves the modified runfile and starts Lisem. On Posix systems usually without a GUI"""
+        Returns:
+        filtered_df
+
+        """
+        sim_file = self['Result Directory'] + '/totalseries.csv'
+        df = pd.read_csv(sim_file, usecols=[0, 10], skiprows=1)
+        # Convert values in 'Column1' to numeric
+        df['Time(min)'] = pd.to_numeric(df['Time(min)'])
+        # Filter rows with integer values in the first column
+        filtered_df = df[df['Time(min)'].astype(int) == df['Time(min)']]
+        # Rename the second column to 'Channels'
+        filtered_df = filtered_df.rename(
+            columns={filtered_df.columns[1]: 'Channels'})
+        filtered_df.reset_index(drop=True, inplace=True)
+        return filtered_df
+
+
+    def run(self, **kwargs) -> pd.DataFrame:
+        """
+        Saves the modified runfile and starts Lisem. On Posix systems usually without a GUI
+        
+        Returns the filtered result
+        """
         for k, v in kwargs.items():
             self[k] = v
         self.save()
         run_args = [str(self.lisempath.absolute())]
-        env = os.environ
+
         if self.virtual_frame_buffer:
-            run_args.insert(0, 'xvfb-run')
-            env |= {'LISEM_CONSOLE': 'X'}
+            run_args.insert(0, 'LISEM_CONSOLE=X xvfb-run')
 
         run_args.extend(['-r', str(self.runfilename().absolute())])
-        print('LISEM_CONSOLE=X ' + ' '.join(run_args))
 
-        os.system('LISEM_CONSOLE=X ' + ' '.join(run_args)) # , env=env, shell=True)
-
+        os.system(' '.join(run_args)) # , env=env, shell=True)
+        
+        return self.get_result()
+    
+    
