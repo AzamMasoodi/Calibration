@@ -1,3 +1,5 @@
+import sys
+import os
 import pandas as pd
 import numpy as np
 from lisemrunner import LisemRunner
@@ -134,13 +136,13 @@ class LisemKOptimizer:
 
 if __name__ == '__main__':
     # Path to the executable file
-    lisem_path = "C:/Masoodi/lisem/lisemv6873/Lisem.exe"
-    run_path = "C:/Masoodi/test/run1/run6.run"
-    
-    sim_file = 'C:/Masoodi/test/res1/totalseries.csv'
-    # Specify the observation CSV file path
-    obs_file = 'C:/Masoodi/test/obs1/obs6.csv'
-    lr = LisemRunner(lisem_path, run_path, 'run6-pk')
+    if len(sys.argv) < 4:
+        sys.stderr.write('Usage: python calibration.py <lisem_path> <runfile> <observation_file>')
+    lisem_path, run_path, obs_file = sys.argv[1:4]
+    lr = LisemRunner(lisem_path, run_path, os.path.basename(run_path).replace('.run', ''))
+    lr.result_path = lr.path.parent.absolute() / 'res'
+    lr['map_dir'] = (lr.path.parent / 'map').absolute().as_posix() + '/'
+    print(lr.name, ':', lr.path, lr.result_path, lr.runfilename(), lr['map_dir'])
     opt = LisemKOptimizer(lr, obs_file)
     #opt.opt_k(1, 5, 5)
     opt.regulaFalsi_k(1, 5, 0.01, 5)

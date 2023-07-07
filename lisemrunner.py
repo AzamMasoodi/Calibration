@@ -36,7 +36,13 @@ class LisemRunner:
     >>> lr.run(ksat=2)
 
     """
-    alias = dict(ksat='Ksat calibration', result_dir='Result Directory')
+    alias = dict(
+        ksat='Ksat calibration',
+        result_dir='Result Directory',
+        map_dir='Map Directory',
+        n_cores='Nr user Cores',
+        adv_options = 'Advanced Options'
+    )
 
     def __init__(self, lisempath, runfile, name, virtual_frame_buffer=True):
         """
@@ -55,6 +61,8 @@ class LisemRunner:
         self.path = Path(runfile).parent
         self.virtual_frame_buffer = virtual_frame_buffer and os.name == 'posix'
         self.result_path = Path(self['Result Directory'])
+        self['Advanced Options'] = 1
+        self['n_cores'] = 1
         
     def __getitem__(self, item):
         item = self.alias.get(item, item.replace('_', ' '))
@@ -105,8 +113,8 @@ class LisemRunner:
 
     def save(self):
         """Save the modified runfile"""
-        print((self.result_path / self.name).as_posix())
-        self['Result Directory'] = (self.result_path / self.name).as_posix()
+        print((self.result_path / self.name).as_posix() + '/')
+        self['Result Directory'] = (self.result_path / self.name).as_posix() + '/'
         self.runfilename().write_text(self.runfile)
 
     def get_result(self):
@@ -118,7 +126,7 @@ class LisemRunner:
         filtered_df
 
         """
-        sim_file = self['Result Directory'] + '/totalseries.csv'
+        sim_file = self['Result Directory'] + 'totalseries.csv'
         df = pd.read_csv(sim_file, usecols=[0, 10], skiprows=1)
         # Convert values in 'Column1' to numeric
         df['Time(min)'] = pd.to_numeric(df['Time(min)'])
@@ -146,7 +154,7 @@ class LisemRunner:
             run_args.insert(0, 'LISEM_CONSOLE=X xvfb-run')
 
         run_args.extend(['-r', str(self.runfilename().absolute())])
-
+        print('$', ' '.join(run_args))
         os.system(' '.join(run_args)) # , env=env, shell=True)
         
         return self.get_result()
