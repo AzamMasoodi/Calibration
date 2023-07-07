@@ -1,16 +1,13 @@
-import os
-import rasterio
-import csv
 import pandas as pd
 import numpy as np
-import re
-
+from lisemrunner import LisemRunner
 
 class LisemKOptimizer:
-    def __init__(self, run_file, obs_file, lisem_path):
-        self.run_file = run_file
+
+    def __init__(self, lisemrunner:LisemRunner,  obs_file):
+        self.runner = lisemrunner
+        self.runner_base_name = self.runner.name
         self.obs_file = obs_file
-        self.lisem_path = lisem_path
 
     def regulaFalsi_k(self, min_k, max_k, epsilon, num_steps: int):
         """
@@ -110,44 +107,10 @@ class LisemKOptimizer:
         nse, bias (float)
 
         """
-        self.open_lisem(k)
-        output_df = self.filterdata()
+        self.runner.name = self.runner_base_name + f'_k_{k:0.4f}'
+        output_df = self.runner.run(ksat=k)
         return self.nse(obs_file, output_df)
 
-    def get_value_from_runfile(self, variablename):
-        """
-        Gets a value from the runfile
-        """
-        runfile = open(self.run_file).read()
-        m = re.search(variablename + '=(.*)', runfile)
-        if not m:
-            raise ValueError(
-                f'{variablename} not in lisem runfile {self.run_file}')
-        return m.group(1)
-
-    def open_lisem(self, k):
-        """
-        Opens a raster file, replaces cell values with 'k' value,
-        and runs the LISEM model.
-
-        Args:
-            k (float): Value of 'k' to replace cell values in the raster.
-
-        Returns:
-            totalseries.csv
-
-        """
-        # Open ksat raster - can't be an absolute path. Change to relative path with variable name
-        map_dir = self.get_value_from_runfile('Map Directory')
-        ksat_file = rasterio.open(map_dir + "/ksat1.map", "r+")
-        ksat = ksat_file.read(1)
-        # Replace cell value with k value
-        ksat[:, :] = k
-        # Save the modified data back to the raster file
-        ksat_file.write(ksat, 1)
-        ksat_file.close()  # Close the raster file
-        # Run lisem with the run file
-        os.system(f"{lisem_path} -r {run_path}")
 
     def nse(self, obs_file, output_df):
         """
@@ -169,36 +132,15 @@ class LisemKOptimizer:
         print('Nash-Sutcliffe Efficiency:', nse)
         return nse, bias
 
-    def filterdata(self):
-        """
-        Reads a CSV file ('totalseries.csv'), filters the data based on the first and tenth columns,
-        converts the 'Time' column which is an integer, and saves the filtered data to a new CSV file ('filtered_data.csv').
-
-        Returns:
-        filtered_df
-
-        """
-        sim_file = self.get_value_from_runfile(
-            'Result Directory') + '/totalseries.csv'
-        df = pd.read_csv(sim_file, usecols=[0, 10], skiprows=1)
-        # Convert values in 'Column1' to numeric
-        df['Time(min)'] = pd.to_numeric(df['Time(min)'])
-        # Filter rows with integer values in the first column
-        filtered_df = df[df['Time(min)'].astype(int) == df['Time(min)']]
-        # Rename the second column to 'Channels'
-        filtered_df = filtered_df.rename(
-            columns={filtered_df.columns[1]: 'Channels'})
-        filtered_df.reset_index(drop=True, inplace=True)
-        return filtered_df
-
 if __name__ == '__main__':
     # Path to the executable file
     lisem_path = "C:/Masoodi/lisem/lisemv6873/Lisem.exe"
     run_path = "C:/Masoodi/test/run1/run6.run"
-    k_path = "C:/Masoodi/test/map1/ksat1.map"
+    
     sim_file = 'C:/Masoodi/test/res1/totalseries.csv'
     # Specify the observation CSV file path
     obs_file = 'C:/Masoodi/test/obs1/obs6.csv'
-    opt = LisemKOptimizer(run_path, obs_file, lisem_path)
-    opt.opt_k(1, 5, 5)
-    #opt.regulaFalsi_k(1, 5, 0.01, 5)
+    lr = LisemRunner(lisem_path, run_path, 'run6-pk')
+    opt = LisemKOptimizer(lr, obs_file)
+    #opt.opt_k(1, 5, 5)
+    opt.regulaFalsi_k(1, 5, 0.01, 5)
