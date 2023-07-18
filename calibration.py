@@ -131,7 +131,7 @@ class LisemKOptimizer:
         nse = 1 - (np.sum((output_df.Channels - obs_df.Channels) ** 2)) / \
             (np.sum((obs_df.Channels - obs_df.Channels.mean()) ** 2))
         bias = output_df.Channels.mean() - obs_df.Channels.mean()
-        print('Nash-Sutcliffe Efficiency:', nse)
+        print('Nash-Sutcliffe Efficiency:', nse, ' Bias: ', bias)
         return nse, bias
 
 if __name__ == '__main__':
@@ -139,10 +139,11 @@ if __name__ == '__main__':
     if len(sys.argv) < 4:
         sys.stderr.write('Usage: python calibration.py <lisem_path> <runfile> <observation_file>')
     lisem_path, run_path, obs_file = sys.argv[1:4]
-    lr = LisemRunner(lisem_path, run_path, os.path.basename(run_path).replace('.run', ''))
+    lr = LisemRunner(lisem_path, run_path, os.path.basename(run_path).replace('.run', '-c'))
     lr.result_path = lr.path.parent.absolute() / 'res'
     lr['map_dir'] = (lr.path.parent / 'map').absolute().as_posix() + '/'
     print(lr.name, ':', lr.path, lr.result_path, lr.runfilename(), lr['map_dir'])
+    lr.save()
     opt = LisemKOptimizer(lr, obs_file)
-    #opt.opt_k(1, 5, 5)
-    opt.regulaFalsi_k(1, 5, 0.01, 5)
+    opt.opt_k(5, 15, 5)
+    #opt.regulaFalsi_k(5.0, 15.0, 0.01, 5)
