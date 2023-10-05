@@ -1,10 +1,13 @@
 """
 A wrapper to run open lisem from Python
 """
+import sys
 import os
 from pathlib import Path
 import re
 import pandas as pd
+import numpy as np
+import locale
 
 class LisemRunner:
     """
@@ -55,6 +58,7 @@ class LisemRunner:
             virtual_frame_buffer: A boolean flag to indicate if Lisem should be run in a virtual framebuffer for speed up
                                 and to run on headless systems. Ignored on non-posix systems
         """
+        locale.setlocale(locale.LC_NUMERIC, '')
         self.runfile = Path(runfile).read_text()
         self.name = name
         self.lisempath = Path(lisempath).absolute()
@@ -63,7 +67,7 @@ class LisemRunner:
         self.result_path = Path(self['Result Directory'])
         self['Advanced Options'] = 1
         self['n_cores'] = 1
-        
+
     def __getitem__(self, item):
         item = self.alias.get(item, item.replace('_', ' '))
         m = re.search(f'^{item}\\ *=\\ *(.*)', self.runfile, flags=re.MULTILINE)
@@ -80,8 +84,14 @@ class LisemRunner:
 
     def __setitem__(self, item, value):
         item = self.alias.get(item, item.replace('_', ' '))
+
         # Use os locale to convert float to str
-        value = str(value) # .replace('.', ',')
+        # Check for float and any np.float: https://stackoverflow.com/questions/28292542/how-to-check-if-a-number-is-a-np-float64-or-np-float32-or-np-float16
+        if isinstance(value, (np.floating, float)):
+            value = locale.format('%0.2f', value)
+        else:
+            value = str(value)
+        print(item, '=', value)
         new_runfile, n = re.subn(f'^{item}\\ *=\\ *(.*)', item + '=' + value, self.runfile, flags=re.MULTILINE)
         if n == 0:
             raise KeyError(f'{item} not in lisem runfile')
@@ -99,13 +109,16 @@ class LisemRunner:
     def keys(self):
         for m in re.finditer('(.*)=(.*)', self.runfile, flags=re.MULTILINE):
             yield m.group(1)
-            
+
     def __iter__(self):
         return self.keys()
 
     def values(self):
         for m in re.finditer('(.*)=(.*)', self.runfile, flags=re.MULTILINE):
             yield m.group(2)
+
+    def __str__(self):
+        return f'LisemRunner(name={self.name}, result_path={self.result_path.as_posix()}, run_path={self.runfilename().as_posix()})'
 
     def runfilename(self) -> Path:
         """
@@ -130,6 +143,7 @@ class LisemRunner:
 
         """
         sim_file = self['Result Directory'] + 'totalseries.csv'
+        print('Load simulation file:',sim_file)
         df = pd.read_csv(sim_file, usecols=[0, 10], skiprows=1)
         # Convert values in 'Column1' to numeric
         df['Time(min)'] = pd.to_numeric(df['Time(min)'])
@@ -151,6 +165,8 @@ class LisemRunner:
         for k, v in kwargs.items():
             self[k] = v
         self.save()
+        os.makedirs(self.result_path, exist_ok=True)
+
         run_args = [str(self.lisempath.absolute())]
 
         if self.virtual_frame_buffer:
@@ -158,10 +174,10 @@ class LisemRunner:
 
         run_args.extend(['-r', str(self.runfilename().absolute())])
         print('$', ' '.join(run_args))
-        os.system(' '.join(run_args)) # , env=env, shell=True)
-        
+        os.system(' '.join(run_args))
         return self.get_result()
-
+    
+    
 
 def nse(obs_file, output_df):
     """
@@ -186,16 +202,14 @@ def nse(obs_file, output_df):
     return nse, pbias
 
 
-
-
 if __name__ == '__main__':
     if len(sys.argv) < 4:
-        sys.stderr.write('Usage: python lisemrunner.py <lisem_path> <runfile> <observation_file>')
+        sys.stderr.write('Usage: python calibration.py <lisem_path> <runfile> <observation_file>')
     lisem_path, run_path, obs_file = sys.argv[1:4]
     lr = LisemRunner(lisem_path, run_path, os.path.basename(run_path).replace('.run', ''))
     lr.result_path = lr.path.parent.absolute() / 'res'
     lr['map_dir'] = (lr.path.parent / 'map').absolute().as_posix() + '/'
-    print(lr.name, ':', lr.path, lr.result_path, lr.runfilename(), lr['map_dir'])
-    sim_df = lr.run(ksat=1.0)
+    print(lr)
+    sim_df = lr.run()
     nse(obs_file, sim_df)
 
