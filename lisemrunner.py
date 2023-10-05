@@ -89,6 +89,9 @@ class LisemRunner:
             raise KeyError(f'{item} is duplicated')
         self.runfile = new_runfile
 
+    def __contains__(self, item):
+        return item in list(self.keys())
+
     def items(self):
         for m in re.finditer('(.*)=(.*)', self.runfile, flags=re.MULTILINE):
             yield m.group(1), m.group(2)
@@ -158,5 +161,41 @@ class LisemRunner:
         os.system(' '.join(run_args)) # , env=env, shell=True)
         
         return self.get_result()
-    
-    
+
+
+def nse(obs_file, output_df):
+    """
+    Calculates the Nash-Sutcliffe Efficiency (NSE) using observation and simulation data from CSV files.
+    Parameters:
+        obs_file (str): Path to the observation CSV file.
+        output_df (pd.DataFrame): A dataframe containing the simulation result, as prepared by filterdata
+
+    Returns:
+        float: Nash-Sutcliffe Efficiency (NSE) value.
+
+    """
+    import numpy as np
+    obs_df = pd.read_csv(obs_file)
+    # Calculate the Nash-Sutcliffe Efficiency
+    nse = (1 -
+           ((output_df.Channels - obs_df.Channels) ** 2).sum() /
+           ((obs_df.Channels - obs_df.Channels.mean()) ** 2).sum()
+           )
+    pbias = (output_df.Channels.mean() - obs_df.Channels.mean()) / obs_df.Channels.mean() * 100
+    print('Nash-Sutcliffe Efficiency:', nse, 'pBias:', pbias )
+    return nse, pbias
+
+
+
+
+if __name__ == '__main__':
+    if len(sys.argv) < 4:
+        sys.stderr.write('Usage: python lisemrunner.py <lisem_path> <runfile> <observation_file>')
+    lisem_path, run_path, obs_file = sys.argv[1:4]
+    lr = LisemRunner(lisem_path, run_path, os.path.basename(run_path).replace('.run', ''))
+    lr.result_path = lr.path.parent.absolute() / 'res'
+    lr['map_dir'] = (lr.path.parent / 'map').absolute().as_posix() + '/'
+    print(lr.name, ':', lr.path, lr.result_path, lr.runfilename(), lr['map_dir'])
+    sim_df = lr.run(ksat=1.0)
+    nse(obs_file, sim_df)
+
