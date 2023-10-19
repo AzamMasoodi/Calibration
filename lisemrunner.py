@@ -41,13 +41,14 @@ class LisemRunner:
     """
     alias = dict(
         ksat='Ksat calibration',
+        Psi = 'Psi calibration',
         result_dir='Result Directory',
         map_dir='Map Directory',
         n_cores='Nr user Cores',
-        adv_options = 'Advanced Options'
+        adv_options = 'Advanced Options',
     )
 
-    def __init__(self, lisempath, runfile, name, virtual_frame_buffer=True):
+    def __init__(self, lisempath, runfile, name, resultpath=None):
         """
         Creates the Lisem wrapper
         Args:
@@ -63,8 +64,11 @@ class LisemRunner:
         self.name = name
         self.lisempath = Path(lisempath).absolute()
         self.path = Path(runfile).parent
-        self.virtual_frame_buffer = virtual_frame_buffer and os.name == 'posix'
-        self.result_path = Path(self['Result Directory'])
+        if resultpath:
+            self.result_path = Path(resultpath).absolute()
+            self['Result Directory'] = str(self.result_path)
+        else:
+            self.result_path = Path(self['Result Directory'])
         self['Advanced Options'] = 1
         self['n_cores'] = 1
 
@@ -168,9 +172,6 @@ class LisemRunner:
         os.makedirs(self.result_path, exist_ok=True)
 
         run_args = [str(self.lisempath.absolute())]
-
-        if self.virtual_frame_buffer:
-            run_args.insert(0, 'LISEM_CONSOLE=X xvfb-run')
 
         run_args.extend(['-r', str(self.runfilename().absolute())])
         print('$', ' '.join(run_args))
