@@ -11,8 +11,6 @@ class TableRunner:
     """
     This class runs openlisem from a pandas dataframe, (eg. loaded from Excel), either sequentially
     or parallel using multiprocessing
-
-    UNTESTED!
     """
     def __init__(self, lisempath: Path, basepath: Path=None, ncores: int = 1):
         self.ncores = ncores
@@ -40,7 +38,7 @@ class TableRunner:
     
     @staticmethod
     def _create_result_df(table):
-        result_df = pd.DataFrame(table.iloc[:, :3], index=table.index)
+        result_df = pd.DataFrame(table)
         result_df['NSE'] = float("nan")
         result_df['pBias'] = float("nan")
         return result_df
