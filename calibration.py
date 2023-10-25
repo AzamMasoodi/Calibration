@@ -130,8 +130,8 @@ class LisemKOptimizer:
         # Calculate the Nash-Sutcliffe Efficiency
         nse = 1 - (np.sum((output_df.Channels - obs_df.Channels) ** 2)) / \
             (np.sum((obs_df.Channels - obs_df.Channels.mean()) ** 2))
-        bias = output_df.Channels.mean() - obs_df.Channels.mean()
-        print('Nash-Sutcliffe Efficiency:', nse, ' Bias: ', bias)
+        bias = (output_df.Channels.mean() - obs_df.Channels.mean())/obs_df.Channels.mean() * 100
+        print('Nash-Sutcliffe Efficiency:', nse, ' pBias: ', bias)
         return nse, bias
 
 if __name__ == '__main__':
