@@ -33,8 +33,8 @@ class Parameters:
             for p in spotpy.parameter.get_parameters_from_setup(params)
         )
     
-    Ksat = u(1, 30, 11, 'Ksat calibration')
-    Psi = u(0.2, 3, 1.0, 'Psi calibration')
+    Ksat = u(0.5, 100, 11, 'Ksat calibration')
+    Psi = u(0.1, 100, 1.0, 'Psi calibration')
     n0 = u(0.1, 10, 1.0, 'N calibration')
     theta = u(0.1, 2, 1.0, 'Theta calibration')
 
