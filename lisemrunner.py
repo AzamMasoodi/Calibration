@@ -8,6 +8,10 @@ import re
 import pandas as pd
 import numpy as np
 import locale
+import logging
+import shutil
+
+logger = logging.getLogger(__name__)
 
 class LisemRunner:
     """
@@ -48,7 +52,7 @@ class LisemRunner:
         adv_options = 'Advanced Options',
     )
 
-    def __init__(self, lisempath, runfile, name, resultpath=None):
+    def __init__(self, lisempath, runfile, name, resultpath=None, silent=False):
         """
         Creates the Lisem wrapper
         Args:
@@ -71,6 +75,7 @@ class LisemRunner:
             self.result_path = Path(self['Result Directory'])
         self['Advanced Options'] = 1
         self['n_cores'] = 1
+        self.silent = silent
 
     def __getitem__(self, item):
         item = self.alias.get(item, item.replace('_', ' '))
@@ -95,7 +100,7 @@ class LisemRunner:
             value = locale.format('%0.2f', value)
         else:
             value = str(value)
-        print(item, '=', value)
+        logger.info(item, '=', value)
         new_runfile, n = re.subn(f'^{item}\\ *=\\ *(.*)', item + '=' + value, self.runfile, flags=re.MULTILINE)
         if n == 0:
             raise KeyError(f'{item} not in lisem runfile')
@@ -133,9 +138,16 @@ class LisemRunner:
 
     def save(self):
         """Save the modified runfile"""
-        print((self.result_path / self.name).as_posix() + '/')
+        logger.info((self.result_path / self.name).as_posix() + '/')
         self['Result Directory'] = (self.result_path / self.name).as_posix() + '/'
         self.runfilename().write_text(self.runfile)
+
+    def clean(self):
+        """
+        Deletes the saved runfile and all results
+        """
+        shutil.rmtree(self.result_path / self.name)
+        self.runfilename().unlink()
 
     def get_result(self):
         """
@@ -147,7 +159,7 @@ class LisemRunner:
 
         """
         sim_file = self['Result Directory'] + 'totalseries.csv'
-        print('Load simulation file:',sim_file)
+        logger.info('Load simulation file:',sim_file)
         df = pd.read_csv(sim_file, usecols=[0, 10], skiprows=1)
         # Convert values in 'Column1' to numeric
         df['Time(min)'] = pd.to_numeric(df['Time(min)'])
@@ -174,7 +186,9 @@ class LisemRunner:
         run_args = [str(self.lisempath.absolute())]
 
         run_args.extend(['-r', str(self.runfilename().absolute())])
-        print('$', ' '.join(run_args))
+        if self.silent:
+            run_args.append('>/dev/null 2>/dev/null')
+        logger.info('$', ' '.join(run_args))
         os.system(' '.join(run_args))
         return self.get_result()
     
@@ -199,7 +213,7 @@ def nse(obs_file, output_df):
            ((obs_df.Channels - obs_df.Channels.mean()) ** 2).sum()
            )
     pbias = (output_df.Channels.mean() - obs_df.Channels.mean()) / obs_df.Channels.mean() * 100
-    print('Nash-Sutcliffe Efficiency:', nse, 'pBias:', pbias )
+    logger.info('Nash-Sutcliffe Efficiency:', nse, 'pBias:', pbias )
     return nse, pbias
 
 
@@ -210,7 +224,7 @@ if __name__ == '__main__':
     lr = LisemRunner(lisem_path, run_path, os.path.basename(run_path).replace('.run', ''))
     lr.result_path = lr.path.parent.absolute() / 'res'
     lr['map_dir'] = (lr.path.parent / 'map').absolute().as_posix() + '/'
-    print(lr)
+    logger.info(lr)
     sim_df = lr.run()
     nse(obs_file, sim_df)
 
