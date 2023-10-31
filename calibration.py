@@ -127,6 +127,9 @@ class LisemKOptimizer:
         """
 
         obs_df = pd.read_csv(self.obs_file)
+        # Calculate the values of the hydrograph from the cumulative values
+        obs_df['Channels'] = obs_df['Channels'].diff().fillna(obs_df['Channels'])
+        output_df['Channels'] = output_df['Channels'].diff().fillna(output_df['Channels'])
         # Calculate the Nash-Sutcliffe Efficiency
         nse = 1 - (np.sum((output_df.Channels - obs_df.Channels) ** 2)) / \
             (np.sum((obs_df.Channels - obs_df.Channels.mean()) ** 2))
