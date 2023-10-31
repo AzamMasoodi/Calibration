@@ -207,6 +207,9 @@ def nse(obs_file, output_df):
     """
     import numpy as np
     obs_df = pd.read_csv(obs_file)
+    # Calculate the values of the hydrograph from the cumulative values
+    obs_df['Channels'] = obs_df['Channels'].diff().fillna(obs_df['Channels'])
+    output_df['Channels'] = output_df['Channels'].diff().fillna(output_df['Channels'])
     # Calculate the Nash-Sutcliffe Efficiency
     nse = (1 -
            ((output_df.Channels - obs_df.Channels) ** 2).sum() /
