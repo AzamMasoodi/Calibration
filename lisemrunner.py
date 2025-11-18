@@ -216,7 +216,15 @@ def nse(obs_file, output_df):
            ((obs_df.Channels - obs_df.Channels.mean()) ** 2).sum()
            )
     pbias = (output_df.Channels.mean() - obs_df.Channels.mean()) / obs_df.Channels.mean() * 100
-    logger.info('Nash-Sutcliffe Efficiency:', nse, 'pBias:', pbias )
+    # Calculate the Pearson correlation coefficient (r)
+    r = obs_df.Channels.corr(output_df.Channels)
+    # Calculate the alpha (ratio of the standard deviation of simulated to observed values)
+    alpha = output_df.Channels.std() / obs_df.Channels.std()
+    # Calculate the beta (ratio of the mean of simulated to observed values)
+    beta = output_df.Channels.mean() / obs_df.Channels.mean()
+    # Calculate Kling-Gupta Efficiency (KGE)
+    kge_value = 1 - np.sqrt((r - 1)**2 + (alpha - 1)**2 + (beta - 1)**2)
+    logger.info('Nash-Sutcliffe Efficiency:', nse, 'pBias:', pbias , 'Kling-Gupta Efficiency (KGE):', kge_value )
     return nse, pbias
 
 
